@@ -194,7 +194,7 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="h-screen w-screen bg-rose-50 overflow-hidden relative font-sans flex">
+    <div className="h-[100dvh] w-screen bg-rose-50 overflow-hidden relative font-sans flex">
       {/* Background decorations */}
       <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-rose-100/30 blur-[120px] rounded-full pointer-events-none"></div>
       <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-rose-200/30 blur-[120px] rounded-full pointer-events-none"></div>
