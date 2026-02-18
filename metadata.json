@@ -1,0 +1,7 @@
+{
+  "name": "Our Global Love Story",
+  "description": "A personalized interactive map to track our shared memories and future travel dreams together.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}
