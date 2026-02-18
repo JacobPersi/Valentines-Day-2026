@@ -22,7 +22,7 @@ const App: React.FC = () => {
 
   // Settings modal state
   const [settingsTab, setSettingsTab] = useState<'data' | 'config'>('data');
-  const [jsonInput, setJsonInput] = useState('');
+  // const [jsonInput, setJsonInput] = useState(''); // Removed
   const [configDraft, setConfigDraft] = useState<AppConfig>(DEFAULT_CONFIG);
 
   // Initialize sidebar state based on viewport - desktop open by default, mobile closed
@@ -144,48 +144,62 @@ const App: React.FC = () => {
 
   const openSettingsModal = () => {
     setSettingsTab('data');
-    setJsonInput(JSON.stringify({ pins, config }, null, 2));
+    setSettingsTab('data');
+    // setJsonInput(JSON.stringify({ pins, config }, null, 2)); // Removed
     setConfigDraft({ ...config });
     setShowDataModal(true);
   };
 
   const handleExport = () => {
     const payload = JSON.stringify({ pins, config }, null, 2);
-    setJsonInput(payload);
-    navigator.clipboard.writeText(payload);
-    alert("Map data copied to clipboard!");
+    const blob = new Blob([payload], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'love-story-backup.json';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
-  const handleImport = async () => {
-    try {
-      const parsed = JSON.parse(jsonInput);
+  const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
 
-      // Support both legacy format (plain array) and new format ({ pins, config })
-      const importedPins: TravelPin[] = Array.isArray(parsed) ? parsed : (parsed.pins ?? []);
-      const importedConfig: AppConfig | null = !Array.isArray(parsed) && parsed.config ? parsed.config : null;
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const content = e.target?.result as string;
+        const parsed = JSON.parse(content);
 
-      if (!Array.isArray(importedPins)) {
-        alert("Invalid format. Please provide a valid data export.");
-        return;
+        // Support both legacy format (plain array) and new format ({ pins, config })
+        const importedPins: TravelPin[] = Array.isArray(parsed) ? parsed : (parsed.pins ?? []);
+        const importedConfig: AppConfig | null = !Array.isArray(parsed) && parsed.config ? parsed.config : null;
+
+        if (!Array.isArray(importedPins)) {
+          alert("Invalid format. Please provide a valid data export.");
+          return;
+        }
+
+        for (const pin of importedPins) {
+          await savePinToDB(pin);
+        }
+        setPins(importedPins);
+
+        if (importedConfig) {
+          await saveConfig(importedConfig);
+          setConfigDraft(importedConfig);
+        }
+
+        setShowDataModal(false);
+        alert("Success! Your memories have been imported.");
+      } catch (err) {
+        console.error(err);
+        alert("Failed to parse JSON or save data.");
       }
-
-      for (const pin of importedPins) {
-        await savePinToDB(pin);
-      }
-      setPins(importedPins);
-
-      if (importedConfig) {
-        await saveConfig(importedConfig);
-        setConfigDraft(importedConfig);
-      }
-
-      setShowDataModal(false);
-      setJsonInput('');
-      alert("Success! Your memories have been imported.");
-    } catch (e) {
-      console.error(e);
-      alert("Failed to parse JSON or save data.");
-    }
+    };
+    reader.readAsText(file);
   };
 
   const handleSaveConfig = async () => {
@@ -340,35 +354,41 @@ const App: React.FC = () => {
 
             {settingsTab === 'data' ? (
               <>
-                <div className="mb-4 flex-1 overflow-y-auto">
-                  <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 mb-2 block">JSON Payload</label>
-                  <textarea
-                    value={jsonInput}
-                    onChange={(e) => setJsonInput(e.target.value)}
-                    placeholder="Paste memory data here..."
-                    className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl p-4 font-mono text-[10px] text-slate-600 focus:bg-white focus:border-rose-300 transition-all outline-none resize-none min-h-[250px] leading-relaxed"
-                  />
+                <div className="flex-1 flex flex-col justify-center items-center gap-6 p-8">
+                  <div className="text-center space-y-2">
+                    <div className="w-16 h-16 bg-rose-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <Icon name="Settings" className="w-8 h-8 text-rose-500" />
+                    </div>
+                    <h3 className="text-lg font-serif text-slate-800">Backup & Restore</h3>
+                    <p className="text-sm text-slate-500 max-w-xs mx-auto">
+                      Save a copy of your memories to your device, or restore from a previous backup.
+                    </p>
+                  </div>
+
+                  <div className="flex flex-col gap-4 w-full max-w-xs">
+                    <button
+                      onClick={handleExport}
+                      className="w-full bg-white border-2 border-rose-100 text-rose-500 font-bold py-4 rounded-2xl hover:bg-rose-50 transition-all flex items-center justify-center gap-3"
+                    >
+                      <Icon name="Download" className="w-5 h-5" />
+                      Download Backup
+                    </button>
+
+                    <label className="w-full bg-rose-500 text-white font-bold py-4 rounded-2xl shadow-lg hover:bg-rose-600 transition-all flex items-center justify-center gap-3 cursor-pointer">
+                      <Icon name="Upload" className="w-5 h-5" />
+                      Upload Backup
+                      <input
+                        type="file"
+                        accept=".json"
+                        onChange={handleImport}
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <button
-                    onClick={handleExport}
-                    className="bg-white border-2 border-rose-100 text-rose-500 font-bold py-4 rounded-2xl hover:bg-rose-50 transition-all flex items-center justify-center gap-2"
-                  >
-                    <Icon name="Camera" className="w-4 h-4" />
-                    Copy Data
-                  </button>
-                  <button
-                    onClick={handleImport}
-                    className="bg-rose-500 text-white font-bold py-4 rounded-2xl shadow-lg hover:bg-rose-600 transition-all flex items-center justify-center gap-2"
-                  >
-                    <Icon name="Plus" className="w-4 h-4" />
-                    Import Text
-                  </button>
-                </div>
-
-                <p className="mt-6 text-center text-[9px] text-slate-400 italic">
-                  Use this to backup our memories or sync between devices.
+                <p className="text-center text-[10px] text-slate-400 italic mt-auto">
+                  Files are saved as .json. Keep them safe!
                 </p>
               </>
             ) : (
@@ -434,8 +454,9 @@ const App: React.FC = () => {
             )}
           </div>
         </div>
-      )}
-    </div>
+      )
+      }
+    </div >
   );
 };
 
